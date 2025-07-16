@@ -9,7 +9,7 @@ Log dosyaları, 10 MB boyutuna ulaştığında yeni bir dosya oluşturur ve en f
 """
 
 import logging
-import logging.handlers
+from logging.handlers import RotatingFileHandler
 import sys
 import os
 
