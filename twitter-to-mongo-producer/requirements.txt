@@ -1,0 +1,10 @@
+certifi==2025.7.14
+charset-normalizer==3.4.2
+dnspython==2.7.0
+idna==3.10
+oauthlib==3.3.1
+pymongo==4.13.2
+requests==2.32.4
+requests-oauthlib==2.0.0
+tweepy==4.16.0
+urllib3==2.5.0
