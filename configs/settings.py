@@ -15,7 +15,10 @@ X_API_KEY_SECRET = os.getenv('X_API_KEY_SECRET')
 X_BEARER_TOKEN = os.getenv('X_BEARER_TOKEN')
 
 # MongoDB 
-MONGO_HOST = os.getenv('MONGO_HOST')
+MONGO_CLIENT = os.getenv('MONGO_CLIENT')
+
+# Apache Kafka
+KAFKA_SERVER = os.getenv('KAFKA_SERVER')
 
 
 
