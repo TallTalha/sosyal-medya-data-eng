@@ -86,7 +86,7 @@ def create_kafka_producer():
     logger.info("Kafka producer oluşturuluyor...")
     try:
         producer = KafkaProducer(
-            bootstarpserver= KAFKA_SERVER,
+            bootstrap_servers= KAFKA_SERVER,
             value_serializer=lambda v: json.dumps(v, default=str).encode('utf-8')
         )
         logger.info("Kafka Producer oluşturuldu.")
@@ -270,10 +270,10 @@ def search_text_in_tweets(client: tweepy.Client, collection: pymongo.collection.
         for _ in range(max_tweets):
             fake_tweet = _generate_fake_tweet(query)
             try:
-                producer.send(kafka_topic, value=tweet.data)
+                producer.send(kafka_topic, value=fake_tweet)
             except KafkaError as ke:
                 logger.error(f"Kafka ya tekil sahte mesaj gönderilirken hata: {ke}")
-            tweets_to_insert.append(tweet)
+            tweets_to_insert.append(fake_tweet)
                 
         _save_tweets_to_mongo(tweets_to_insert, collection)
         logger.info(f"{query} içerikli tweetler için sahte veriler, MongoDB ve Kafka ya gönderildi.")
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     client = create_twitter_api_client()
     mongo_collection = get_mongodb_collection()
     kafka_producer = create_kafka_producer()
-    kafka_topic = "raw-tweets"
+    kafka_topic = "raw-tweets-stream"
     
     if client and mongo_collection is not None and kafka_producer:
         # Belirli bir kullanıcının tweet'lerini alır ve MongoDB koleksiyonuna kaydeder.
