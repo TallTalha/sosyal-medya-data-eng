@@ -1,4 +1,4 @@
-# twitter-to-mongo-producer/twitter_ingestion_service.py
+# twitter-to-mongo-kafka/twitter_ingestion_service.py
 """
 Twitter'dan hem MongoDB'ye hem de Apache Kafka Topiğine veri akışı sağlayan bir Python scriptidir.
 Bu script, Twitter API'si veya Faker kütüphanesinin fake veri üretimi aracılığıyla gelen tweet'leri 
