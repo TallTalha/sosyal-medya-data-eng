@@ -14,5 +14,10 @@ X_API_KEY = os.getenv('X_API_KEY')
 X_API_KEY_SECRET = os.getenv('X_API_KEY_SECRET')
 X_BEARER_TOKEN = os.getenv('X_BEARER_TOKEN')
 
+# MongoDB 
+MONGO_HOST = os.getenv('MONGO_HOST')
+
+
+
 
 

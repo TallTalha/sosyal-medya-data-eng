@@ -5,7 +5,7 @@ Bu uygulama, Twitter API'si aracılığıyla gelen tweet'leri MongoDB veritaban�
 """
 
 # Ortam değişkenlerini configs/settings.py  dosyasından alır.
-from configs.settings import X_API_KEY, X_API_KEY_SECRET, X_BEARER_TOKEN
+from configs.settings import X_API_KEY, X_API_KEY_SECRET, X_BEARER_TOKEN, MONGO_HOST
 
 # Logger kurulumu için utils/logger.py dosyasından setup_logger fonksiyonunu alır.
 from utils.logger import setup_logger
@@ -77,7 +77,7 @@ def get_mongodb_collection(db_name: str = "social_media_db", collection_name:str
         logger.info(f"MongoDB bağlantısı kuruluyor... Veritabanı:{db_name} & Koleksiyon:{collection_name}")
         # Digital Ocean Sunucularındaki Uzak Makineye SSH ile bağlantı sağladığımız
         # için Sunucu IPv4 adresi olmadan localhost ifadesiyle bağlanabiliyoruz.
-        client = pymongo.MongoClient("mongodb://localhost:27017/")
+        client = pymongo.MongoClient(MONGO_HOST)
         db = client[db_name]
         collection = db[collection_name]
         logger.info("MongoDB koleksiyonu başarıyla alındı.")
