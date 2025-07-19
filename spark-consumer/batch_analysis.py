@@ -31,16 +31,21 @@ def main():
         logger.error(f"Spark Session oluşturulamadı: {e}", exc_info=True)
 
     logger.info(f"{KAFKA_TOPIC} topiğinden bilgiler okunuyor.")
-    tweets_df = (
-        spark.read
-        .format("kafka")
-        .option("kafka.bootstrap.server",KAFKA_SERVER)
-        .option("subscribe", KAFKA_TOPIC)
-        .option("startingOffsets", "earliest")
-        .load()
-    )
-    logger.info("Veriler Kafkadan Okundu.")
-    
+    try:
+        tweets_df = (
+            spark.read
+            .format("kafka")
+            .option("kafka.bootstrap.server",KAFKA_SERVER)
+            .option("subscribe", KAFKA_TOPIC)
+            .option("startingOffsets", "earliest")
+            .load()
+        )
+        logger.info("Veriler Kafkadan Okundu.")
+    except KafkaError as ke:
+        logger.critical(f"Kafka topiği okunurken, kafka hata verdi: {ke}", exc_info=True)
+    except Exception as e:
+        logger.critical(f"Spark, Kafka Topiğini okurken hata oluştu:{e}", exc_info=True)
+
     schema = StructType([
         StructField("id", StringType(), True),
         StructField("text", StringType(), True),
@@ -64,6 +69,8 @@ def main():
     ).select("data.*")
 
     value_df = value_df.withColumn("created_at", to_timestamp("created_at", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
+
+    value_df.show()
 
     
 
