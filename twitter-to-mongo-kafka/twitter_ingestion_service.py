@@ -296,13 +296,13 @@ if __name__ == "__main__":
         # Belirli bir kullanıcının tweet'lerini alır ve MongoDB koleksiyonuna kaydeder.
         fetch_user_timeline(client, mongo_collection,
                             producer=kafka_producer,kafka_topic=kafka_topic,
-                            username="elonmusk", max_tweets=10
+                            username="elonmusk", max_tweets=10000
                             )
         
         # Belirli bir metni içeren tweet'leri alır ve MongoDB koleksiyonuna kaydeder.
         search_text_in_tweets(client, mongo_collection,
                                 producer=kafka_producer, kafka_topic=kafka_topic,
-                                query='"SahteVeri" lang:tr -is:retweet', max_tweets=10)
+                                query='"SahteVeri" lang:tr -is:retweet', max_tweets=10000)
     else:
         logger.error("Twitter API istemcisi veya MongoDB koleksiyonu veya Kafka Producer oluşturulamadı. Uygulama sonlandırılıyor.")
     logger.info("twitter_producer.py sonlandırıldı.")
