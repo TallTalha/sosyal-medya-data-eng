@@ -8,20 +8,19 @@ from pyspark.sql.types import StructType, StructField,StringType, IntegerType, T
 from pyspark.sql.functions import from_json, col, to_timestamp
 StructField,StringType, IntegerType, TimestampType
 StructField,StringType, IntegerType, TimestampType
-from kafka.errors import KafkaError
 from utils.logger import setup_logger
 
-logger = setup_logger("batch_analysis")
+LOG = setup_logger("batch_analysis")
 KAFKA_TOPIC = "raw-tweets-stream"
 
 def main():
 
-    logger.info(f"Batch consumer script başlatıldı. Topic: {KAFKA_TOPIC}")
+    LOG.info(f"Batch consumer script başlatıldı. Topic: {KAFKA_TOPIC}")
     kafka_connector_packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
 
-
+    tweets_df = None
     try:
-        logger.info("Spark Session oluşturuyluyor...")
+        LOG.info("Spark Session oluşturuyluyor...")
         spark = (
             SparkSession.builder
             .appName("TweetsConsumerBatchAnalysis")
@@ -29,25 +28,32 @@ def main():
             .config("spark.jars.packages", kafka_connector_packages)
             .getOrCreate()
         )
-        logger.info("Spark Session oluşturuldu.")
+        LOG.info("Spark Session oluşturuldu.")
     except Exception as e:
-        logger.error(f"Spark Session oluşturulamadı: {e}", exc_info=True)
+        LOG.error(f"Spark Session oluşturulamadı: {e}", exc_info=True)
+        return
 
-    logger.info(f"{KAFKA_TOPIC} topiğinden bilgiler okunuyor.")
+    LOG.info(f"{KAFKA_TOPIC} topiğinden bilgiler okunuyor.")
     try:
         tweets_df = (
             spark.read
             .format("kafka")
-            .option("kafka.bootstrap.server",KAFKA_SERVER)
+            .option("kafka.bootstrap.servers",KAFKA_SERVER)
             .option("subscribe", KAFKA_TOPIC)
             .option("startingOffsets", "earliest")
             .load()
         )
-        logger.info("Veriler Kafkadan Okundu.")
-    except KafkaError as ke:
-        logger.critical(f"Kafka topiği okunurken, kafka hata verdi: {ke}", exc_info=True)
+        LOG.info("Veriler Kafkadan Okundu.")
     except Exception as e:
-        logger.critical(f"Spark, Kafka Topiğini okurken hata oluştu:{e}", exc_info=True)
+        LOG.critical(f"Spark, Kafka Topiğini okurken hata oluştu:{e}", exc_info=True)
+        spark.stop()
+        return
+    
+    if tweets_df is None:
+        LOG.error(f"{KAFKA_TOPIC} topiğinde veri yok. İşlem sonlandırıldı.")
+        spark.stop()
+        return
+        
 
     schema = StructType([
         StructField("id", StringType(), True),
@@ -66,7 +72,7 @@ def main():
 
     ])
 
-    logger.info("Veriler ayrıştırılıyor...")
+    LOG.info("Veriler ayrıştırılıyor...")
     value_df = tweets_df.select(
         from_json(col("value").cast("string"), schema=schema).alias("data")
     ).select("data.*")
@@ -74,8 +80,14 @@ def main():
     value_df = value_df.withColumn("created_at", to_timestamp("created_at", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
 
     value_df.cache()
+    LOG.info(f"Toplam {value_df.count()} kayıt işlenmeye hazır.")
 
-    value_df.show()
+    LOG.info("İşlenmiş verinin ilk 5 satırı ve şeması:")
+    value_df.printSchema()
+    value_df.show(5, truncate=False)    
+
+    spark.stop()
+    LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
 
 if __name__ == '__main__':
     main()
