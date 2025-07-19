@@ -17,6 +17,8 @@ KAFKA_TOPIC = "raw-tweets-stream"
 def main():
 
     logger.info(f"Batch consumer script başlatıldı. Topic: {KAFKA_TOPIC}")
+    kafka_connector_packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
+
 
     try:
         logger.info("Spark Session oluşturuyluyor...")
@@ -24,6 +26,7 @@ def main():
             SparkSession.builder
             .appName("TweetsConsumerBatchAnalysis")
             .master("local[*]")
+            .config("spark.jars.packages", kafka_connector_packages)
             .getOrCreate()
         )
         logger.info("Spark Session oluşturuldu.")
@@ -70,7 +73,12 @@ def main():
 
     value_df = value_df.withColumn("created_at", to_timestamp("created_at", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
 
+    value_df.cache()
+
     value_df.show()
+
+if __name__ == '__main__':
+    main()
 
     
 
