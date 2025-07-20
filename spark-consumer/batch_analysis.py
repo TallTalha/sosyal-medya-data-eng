@@ -149,11 +149,12 @@ def main():
     LOG.info(f"Batch analysis başlatıldı. Kafka Topic: {kafka_topic}")
 
     spark = create_spark_session("TweetsConsumerBatchAnalysis")
-
+    
+    raw_tweets_df = None
     # (Extract) Ham Veri Çekilir:
     raw_tweets_df = read_from_kafka(spark=spark,kafka_topic=kafka_topic)
 
-    if raw_tweets_df.isEmpty():
+    if raw_tweets_df is None:
         LOG.warning(f"'{kafka_topic}' topiğinde işlenecek yeni veri bulunamadı. İşlem sonlandırılıyor.")
         spark.stop()
         return
