@@ -5,7 +5,7 @@ Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark 
 from configs.settings import KAFKA_SERVER
 from pyspark.sql import SparkSession 
 from pyspark.sql.types import StructType, StructField,StringType, IntegerType, TimestampType
-from pyspark.sql.functions import from_json, col, to_timestamp
+from pyspark.sql.functions import from_json, col, to_timestamp, date_trunc, count
 StructField,StringType, IntegerType, TimestampType
 StructField,StringType, IntegerType, TimestampType
 from utils.logger import setup_logger
@@ -86,11 +86,12 @@ def main():
     value_df.printSchema()
     value_df.show(5, truncate=False)  
 
-    date_group_df = value_df.groupBy("created_at").count().withColumnRenamed("created_at","dateGroup")
+    daily_df = value_df.withColumn("day",date_trunc("day",col("created_at")))
 
-    retweet_df = value_df.groupBy("created_at").sum("retweet_count").withColumnRenamed("sum(retweet_count)","retweet_count")
-
-    date_group_df.join(retweet_df, retweet_df["created_at"] == date_group_df["dateGroup"]).select("dateGroup","count","retweet_count").show()
+    daily_analysis_df = daily_df.groupBy("day").agg(
+        count("*").alias("toplam_tweet_sayisi"),
+        sum(col("public_metrics.retweet_count")).alias("toplam_retweet_sayisi")
+    ).orderBy(("day").desc())
 
     spark.stop()
     LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
