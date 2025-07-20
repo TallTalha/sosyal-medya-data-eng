@@ -84,7 +84,13 @@ def main():
 
     LOG.info("İşlenmiş verinin ilk 5 satırı ve şeması:")
     value_df.printSchema()
-    value_df.show(5, truncate=False)    
+    value_df.show(5, truncate=False)  
+
+    date_group_df = value_df.groupBy("created_at").count().withColumnRenamed("created_at","dateGroup")
+
+    retweet_df = value_df.groupBy("created_at").sum("retweet_count").withColumnRenamed("sum(retweet_count)","retweet_count")
+
+    date_group_df.join(retweet_df, retweet_df["created_at"] == date_group_df["dateGroup"]).select("dateGroup","count","retweet_count").show()
 
     spark.stop()
     LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
