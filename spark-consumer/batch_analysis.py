@@ -5,7 +5,7 @@ Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark 
 from configs.settings import KAFKA_SERVER
 from pyspark.sql import SparkSession 
 from pyspark.sql.types import StructType, StructField,StringType, IntegerType, TimestampType
-from pyspark.sql.functions import from_json, col, to_timestamp, date_trunc, count
+from pyspark.sql import functions as F
 StructField,StringType, IntegerType, TimestampType
 StructField,StringType, IntegerType, TimestampType
 from utils.logger import setup_logger
@@ -14,7 +14,7 @@ LOG = setup_logger("batch_analysis")
 KAFKA_TOPIC = "raw-tweets-stream"
 
 def main():
-
+    
     LOG.info(f"Batch consumer script başlatıldı. Topic: {KAFKA_TOPIC}")
     kafka_connector_packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
 
@@ -74,10 +74,10 @@ def main():
 
     LOG.info("Veriler ayrıştırılıyor...")
     value_df = tweets_df.select(
-        from_json(col("value").cast("string"), schema=schema).alias("data")
+        F.from_json(F.col("value").cast("string"), schema=schema).alias("data")
     ).select("data.*")
 
-    value_df = value_df.withColumn("created_at", to_timestamp("created_at", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    value_df = value_df.withColumn("created_at", F.to_timestamp("created_at", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
 
     value_df.cache()
     LOG.info(f"Toplam {value_df.count()} kayıt işlenmeye hazır.")
@@ -86,12 +86,16 @@ def main():
     value_df.printSchema()
     value_df.show(5, truncate=False)  
 
-    daily_df = value_df.withColumn("day",date_trunc("day",col("created_at")))
+    daily_df = value_df.withColumn("day",F.date_trunc("day",F.col("created_at")))
 
     daily_analysis_df = daily_df.groupBy("day").agg(
-        count("*").alias("toplam_tweet_sayisi"),
-        sum(col("public_metrics.retweet_count")).alias("toplam_retweet_sayisi")
-    ).orderBy(("day").desc())
+        F.count("*").alias("toplam_tweet_sayisi"),
+        F.sum(F.col("public_metrics.retweet_count")).alias("toplam_retweet_sayisi")
+    ).orderBy(F.col("day").desc())
+
+    LOG.info("Günlük analiz sonuçları:")
+    daily_analysis_df.printSchema()
+    daily_analysis_df.show(10, truncate=False)
 
     spark.stop()
     LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
