@@ -3,15 +3,15 @@
 Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark fonksiyonları kullanarak, verileri işler.
 """
 import sys
-from configs.settings import KAFKA_SERVER
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.types import StructType, StructField,StringType, IntegerType, TimestampType
+from pyspark.sql.types import StructType, StructField,StringType, IntegerType
 from pyspark.sql import functions as F
 from utils.logger import setup_logger
+import os
 
 LOG = setup_logger("batch_analysis")
-KAFKA_TOPIC = "raw-tweets-stream"
-
+KAFKA_SERVER = os.environ.get("KAFKA_SERVER", "localhost:9092") 
+PACKAGES = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
 
 def create_spark_session(appName: str) -> SparkSession:
     """
@@ -58,9 +58,11 @@ def read_from_kafka(spark: SparkSession, kafka_topic: str) -> DataFrame:
             .load()
         )
         LOG.info(f"{kafka_topic} topiğinden veriler başarıyla okundu.")
+        return df
     except Exception as e:
-        LOG.critical(f"Spark, Kafka Topiğini okurken hata oluştu: {e}", exc_info=True)
-        sys.exit(1) # Çıkış -> İşlenecek Veri Okunamadığı İçin Analize Devam Edilmez.
+        LOG.error(f"Spark, Kafka Topiğini okurken hata oluştu: {e}", exc_info=True)
+        return None
+    
 
     
 def transform_tweets(raw_df: DataFrame) -> DataFrame:
@@ -105,7 +107,7 @@ def transform_tweets(raw_df: DataFrame) -> DataFrame:
 
     return final_df
 
-def get_daily_t_rt_count(processed_df: DataFrame) -> DataFrame:
+def analyze_daily_trends(processed_df: DataFrame) -> DataFrame:
     """
     İşlenmiş tweet verisini, günlük bazda toplam tweet ve retweet sayısını gösteren DataFrame'e dömüştürür ve döndürür.
         Args:
@@ -150,12 +152,13 @@ def main():
 
     spark = create_spark_session("TweetsConsumerBatchAnalysis")
     
-    raw_tweets_df = None
+    
     # (Extract) Ham Veri Çekilir:
+    raw_tweets_df = None
     raw_tweets_df = read_from_kafka(spark=spark,kafka_topic=kafka_topic)
 
     if raw_tweets_df is None:
-        LOG.warning(f"'{kafka_topic}' topiğinde işlenecek yeni veri bulunamadı. İşlem sonlandırılıyor.")
+        LOG.warning(f"'{kafka_topic}' topiğinde işlenecek  veri bulunamadı. İşlem sonlandırılıyor.")
         spark.stop()
         return
     
@@ -165,7 +168,7 @@ def main():
     transformed_df.cache()
 
     # Verilerin Günlük Bazda Toplam Tweet ve Retweet Analiz Tablosu Oluşturulur
-    daily_analysis_df = get_daily_t_rt_count(transform_tweets)
+    daily_analysis_df = analyze_daily_trends(transformed_df)
 
     spark.stop()
     LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
