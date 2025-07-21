@@ -1,7 +1,11 @@
 # spark-consumer/daily_trend_analysis.py
 """
-Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark fonksiyonları kullanarak, verileri işler.
-Sonuç olarak, günlük bazda toplam tweet ve retweet sayısını gösteren DataFrame döndürür.
+Açıklama:
+    Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark fonksiyonları kullanarak, verileri işler.
+    Sonuç olarak, günlük bazda toplam tweet ve retweet sayısını gösteren DataFrame döndürür.
+Ne işe yarar ?:
+    Örneğin, bir şirket ile alakalı kelimeleri içeren tweetler bu topiğe aktarılırsa,
+    bu bilgiler kullanarak, şirketin Twitter/X platformundaki günlük trend analizleri ölçülebilir.
 """
 import sys
 from configs.settings import KAFKA_SERVER
