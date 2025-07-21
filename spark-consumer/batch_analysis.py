@@ -3,15 +3,13 @@
 Bu script, Kafka'dan, raw-tweets-stream topiğini consume eder, ardından spark fonksiyonları kullanarak, verileri işler.
 """
 import sys
+from configs.settings import KAFKA_SERVER
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType, StructField,StringType, IntegerType
 from pyspark.sql import functions as F
 from utils.logger import setup_logger
-import os
 
 LOG = setup_logger("batch_analysis")
-KAFKA_SERVER = os.environ.get("KAFKA_SERVER", "localhost:9092") 
-PACKAGES = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
 
 def create_spark_session(appName: str) -> SparkSession:
     """
@@ -23,7 +21,6 @@ def create_spark_session(appName: str) -> SparkSession:
     """
     try:
         LOG.info("Spark Session oluşturuluyor..")
-        packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1"
         spark = (
             SparkSession.builder
             .appName(appName)
@@ -65,31 +62,17 @@ def read_from_kafka(spark: SparkSession, kafka_topic: str) -> DataFrame:
     
 
     
-def transform_tweets(raw_df: DataFrame) -> DataFrame:
+def transform_tweets(raw_df: DataFrame, schema: StructType) -> DataFrame:
     """
     Ham Kafka verisini alır, value sütunundaki bilgileri json formatına ayrıştırır,
     schema yapısına göre tipleri düzeltir ve kalite kontrolü yapar.
         Args:
             raw_df(DataFrame): Ham kafka verisi.
+            schema(StructType): Ham verinin giydirilmesi gereken şema.
         Returns:
             DataFrame: Uygun şemaya göre düzenlemesi yapılmış veri çerçevesi. 
     """
-    schema = StructType([
-        StructField("id", StringType(), True),
-        StructField("text", StringType(), True),
-        StructField("created_at", StringType(), True),
-        StructField("author_id", StringType(), True),
-        StructField("public_metrics", StructType([
-            StructField("retweet_count",IntegerType(), True),
-            StructField("reply_count",IntegerType(), True),
-            StructField("like_count",IntegerType(), True),
-            StructField("quote_count",IntegerType(), True),
-            StructField("impression_count",IntegerType(), True),
-        ]),True),
-        StructField("lang", StringType(), True),
-        StructField("source", StringType(), True)
-
-    ])
+    schema = schema
 
     parsed_df = raw_df.select(
         F.from_json(F.col("value").cast("string"), schema=schema).alias("data")
@@ -164,11 +147,30 @@ def main():
     
     # (Transform) 
     # Ham Veri İşlenebilir Yapıya Dönüştürülür:
-    transformed_df = transform_tweets(raw_tweets_df)
+    schema =  StructType([
+        StructField("id", StringType(), True),
+        StructField("text", StringType(), True),
+        StructField("created_at", StringType(), True),
+        StructField("author_id", StringType(), True),
+        StructField("author_username", StringType(), True), 
+        StructField("follower_count", IntegerType(), True), 
+        StructField("friends_count", IntegerType(), True), 
+        StructField("public_metrics", StructType([
+            StructField("retweet_count",IntegerType(), True),
+            StructField("reply_count",IntegerType(), True),
+            StructField("like_count",IntegerType(), True),
+            StructField("quote_count",IntegerType(), True),
+            StructField("impression_count",IntegerType(), True),
+        ]),True),
+        StructField("lang", StringType(), True),
+        StructField("source", StringType(), True)
+    ])
+    transformed_df = transform_tweets(raw_tweets_df,schema=schema)
     transformed_df.cache()
 
-    # Verilerin Günlük Bazda Toplam Tweet ve Retweet Analiz Tablosu Oluşturulur
+    # Verilerin Günlük Bazda Toplam Tweet ve Retweet Analiz Tablosunu Oluşturur:
     daily_analysis_df = analyze_daily_trends(transformed_df)
+    daily_analysis_df.show()
 
     spark.stop()
     LOG.info("Spark Session başarıyla tamamlandı ve durduruldu.")
