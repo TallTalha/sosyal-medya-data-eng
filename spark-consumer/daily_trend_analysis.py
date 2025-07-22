@@ -121,7 +121,7 @@ def analyze_daily_trends(processed_df: DataFrame) -> DataFrame:
 def main():
     """
     Ana iş akışını yöneten fonksiyondur. 
-    Terminalde `spark-submit [options] batch_analysis.py <kafka_topic_adi> spark-consumer/batch_analysis.py´ 
+    Terminalde `spark-submit [options] spark-consumer/batch_analysis.py <kafka_topic_adi>´ 
     komutuyla Script başlatıldığında <kafka topic> bilgisi main fonksyionu içerisindeki kontrollerde alınır.
     Gerekli paketler [options] kısmından belirtilerek, işlemler gerçekleşmeden indirilir veya yüklenir. 
         Args:
