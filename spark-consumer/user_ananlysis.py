@@ -17,7 +17,7 @@ Ne işe yarar ?:
 """
 import sys
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from pyspark.sql import functions as F
 from configs.settings import KAFKA_SERVER
 from utils.logger import setup_logger
@@ -26,7 +26,7 @@ LOG = setup_logger("user_analysis")
 
 def create_spark_session(appName: str) -> SparkSession:
     """
-    Spark session oluşturur.
+    Spark session oluşturur ve döndürür.
         Args:
             appName(String): Spark Oturumunun ismi.
         Returns:
@@ -57,21 +57,18 @@ def read_from_kafka(spark: SparkSession,kafka_server: str, kafka_topic: str) -> 
         Returns:
             DataFrame: Okunan verinin spark tarafından işlenebilmesi için DataFrame nesnesine dönüşür.
     """
-    try:
-        LOG.info(f"Kafka {kafka_topic} topiğinden veriler okunuyor.")
-        raw_df = (
-            spark.read
-            .format("kafka")
-            .option("kafka.bootstrap.servers",kafka_server)
-            .option("subscribe", kafka_topic)
-            .option("startingOffsets", "earliest")
-            .load
-        )
-        LOG.info(f"Kafka {kafka_topic} topiğinden veriler başarıyla okundu.")
-        return raw_df
-    except Exception as e:
-        LOG.error(f"Kafka {kafka_topic} topiğindne veriler okunurken hata: {e}", exc_info=True)
-        sys.exit(1) # ÇIKIŞ -> Veriye ulaşılamadı.
+    LOG.info(f"Kafka {kafka_topic} topiğinden veriler okunuyor.")
+    raw_df = (
+        spark.read
+        .format("kafka")
+        .option("kafka.bootstrap.servers",kafka_server)
+        .option("subscribe", kafka_topic)
+        .option("startingOffsets", "earliest")
+        .load
+    )
+    LOG.info(f"Kafka {kafka_topic} topiğinden veriler başarıyla okundu.")
+    return raw_df
+
 
 def transform_raw_data(raw_df: DataFrame, schema: StructType) -> DataFrame:
     """
@@ -188,6 +185,107 @@ def get_low_follower_activity(df: DataFrame, point: int = 100) -> DataFrame:
             activity_df(DataFrame): follower_count miktarı point parametresinden az olan kullanıcıların tweet aktivitesi DataFrame'i.
     """
     LOG.info(f"{point}'den az, düşük takipçili (potansiyel fake/yeni) hesapların aktivite analizi...")
-    activity_df = df.filter(F.col("follower_count") < point).count()
+    activity_df = (
+        (df.filter(F.col("follower_count") < point))
+        .groupBy("author_id","author_username","follower_count")
+        .count()
+        .orderBy(F.asc("follower_count"))
+        )
     return activity_df
+
+def main():
+    """
+    Ana iş akışını yöneten fonksiyondur. 
+    Terminalde `spark-submit [options] spark-consumer/user_ananlysis.py <kafka_topic_adi>´ 
+    komutuyla Script başlatıldığında <kafka topic> bilgisi main fonksyionu içerisindeki kontrollerde alınır.
+    Gerekli paketler [options] kısmından belirtilerek, işlemler gerçekleşmeden indirilir veya yüklenir. 
+        Args:
+            None
+        Returns:
+            None
+    """
+    LOG.info("Kullanıcı bazlı analiz başlatıldı.")
+
+    # spark-submit komutundaki argümanları kontrol eder:
+    if len(sys.argv) < 2:
+        LOG.error("Kullanım Hatası: Lütfen okunacak Kafka topic adını argüman olarak belirtin.")
+        LOG.error("Örnek: spark-submit ... user_ananlysis.py <kafka topic>")
+        sys.exit(1) # Çıkış -> Hatalı kullanımda ilgili kafka topiğine erişilemez, ananliz sonlandırılır.
+    kafka_topic = sys.argv[1]
+    LOG.info(f"Batch analysis başlatıldı. Kafka Topic: {kafka_topic}")
+
+    # Sprak Session Oluşturulur
+    spark = create_spark_session("UserBasedBatchAnalysis")
+
+    # Kafkadan Veri Okunur: (Lazy Evulation dolayısyla try-expect bloğu okuma sırasında işe yaramaz)
+    raw_tweets_df = read_from_kafka(spark=spark,kafka_server=KAFKA_SERVER, kafka_topic=kafka_topic)
+    if raw_tweets_df is None:
+        LOG.info(f"Kafka {kafka_topic} topiğinde veri yok.")
+        spark.stop()
+        LOG.info(f"Spark Oturumu sonlnadırıldı.")
+        return
+    
+
+    # Okunan Veri Uygun Shcema ya dönüştürülür:
+    schema =  StructType([
+        StructField("id", StringType(), True),
+        StructField("text", StringType(), True),
+        StructField("created_at", StringType(), True),
+        StructField("author_id", StringType(), True),
+        StructField("author_username", StringType(), True), 
+        StructField("follower_count", IntegerType(), True), 
+        StructField("friends_count", IntegerType(), True), 
+        StructField("public_metrics", StructType([
+            StructField("retweet_count",IntegerType(), True),
+            StructField("reply_count",IntegerType(), True),
+            StructField("like_count",IntegerType(), True),
+            StructField("quote_count",IntegerType(), True),
+            StructField("impression_count",IntegerType(), True),
+        ]),True),
+        StructField("lang", StringType(), True),
+        StructField("source", StringType(), True)
+    ])
+    
+    # Ham veri analiz edilebilir formata ayarlanır.
+    transformed_tweets_df = transform_raw_data(raw_df=raw_tweets_df, schema=schema)
+
+    # id alanları kontrol edilir:
+    final_df = validate_data(transformed_tweets_df)
+    
+    # LAZY EVULATION dolayısıyla Spark hata kontrolü bu kısımda yapılır:
+    try:
+       LOG.info("Spark analiz işlemleri başlatıldı... ")
+
+       # Analizler Sırayla Uygulanır:
+
+       # Analiz 1: Konu hakkında en çok tweet atan kullanıcılar
+       get_top_tweeters(final_df).show(10, truncate=False)
+
+       # Analiz 2: Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar)
+       get_famous_top_tweeters(final_df).show(10,  truncate=False)
+
+       # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
+       isFamous_df = add_isFamous_col(final_df, point=100000)
+       isFamous_df.show(10, truncate=False)
+
+       # Analiz 4: "Ünlü" olan ve olmayanların tweet sayılarının dağılımı
+       get_isFamous_tweet_distribution(isFamous_df).show(10, truncate=False)
+
+       # Analiz 5: Düşük takipçili (potansiyel fake/yeni) hesapların aktivitesi
+       get_low_follower_activity(final_df, point=100).show(10 , truncate=False)
+       LOG.info("Spark ile analizler başarıyla tamamlandı.")
+    except Exception as e:
+        LOG.critical(f"Spark Analizleri sırasında hata oluştu: {e}", exc_info=True)
+    
+    finally:
+        spark.stop()
+        LOG.info("Spark Oturumu durduruldu.")
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+
 
