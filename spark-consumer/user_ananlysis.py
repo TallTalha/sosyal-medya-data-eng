@@ -64,7 +64,7 @@ def read_from_kafka(spark: SparkSession,kafka_server: str, kafka_topic: str) -> 
         .option("kafka.bootstrap.servers",kafka_server)
         .option("subscribe", kafka_topic)
         .option("startingOffsets", "earliest")
-        .load
+        .load()
     )
     LOG.info(f"Kafka {kafka_topic} topiğinden veriler başarıyla okundu.")
     return raw_df
@@ -135,10 +135,13 @@ def get_famous_top_tweeters(df: DataFrame) -> DataFrame:
     """
     LOG.info("Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar) analizi...")
     famous_tweeters_df = (
-        df.groupBy("author_id","author_username","follower_count")
-        .count()
-        .orderBy(F.desc("follower_count"))
+        df.groupBy("author_id", "author_username") 
+        .agg(
+            F.max("follower_count")
+            .alias("max_follower_count")
+        )
     )
+    famous_tweeters_df = famous_tweeters_df.orderBy(F.desc("max_follower_count"))
     return famous_tweeters_df
 
 # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
