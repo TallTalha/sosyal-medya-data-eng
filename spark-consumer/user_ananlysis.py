@@ -157,7 +157,8 @@ def add_isFamous_col(df: DataFrame, point : int = 100000) -> DataFrame:
     """
     LOG.info(f"Takipçi sayısı {point}'den fazla kullanıcılar, isFamous sütünunda True olarak etiketlenecek...")
     isFamous_df = df.withColumn(
-        F.when(
+        F.when( 
+            "isFamous",
             F.col("follower_count") >= point , True
         ).otherwise(False)
     )
