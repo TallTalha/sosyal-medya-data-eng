@@ -153,7 +153,7 @@ FAKE_USER_POOL = [
     {
         "id": str(uuid4()),
         "username": FAKER.unique.user_name(),
-        "follower_count": weighted_random_number(100, 9999999, bias_threshold=10000, bias_ratio=0.99),
+        "follower_count": weighted_random_number(0, 9999999, bias_threshold=1000, bias_ratio=0.99),
         "friends_count": weighted_random_number(100, 99999, bias_threshold=3333, bias_ratio=0.97) 
     }
     for _ in range(NUM_USERS)
