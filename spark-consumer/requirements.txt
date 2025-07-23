@@ -1,4 +1,6 @@
+dnspython==2.7.0
 kafka-python==2.2.15
 py4j==0.10.9.7
+pymongo==4.13.2
 pyspark==3.5.1
 python-dotenv==1.1.1
