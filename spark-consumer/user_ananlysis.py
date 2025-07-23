@@ -45,8 +45,10 @@ def create_spark_session(appName: str) -> SparkSession:
             SparkSession.builder
             .appName(appName)
             .master("local[*]")
+            .config("spark.mongodb.write.connection.uri", MONGO_CLIENT)
             .getOrCreate()
         )   
+        spark.sparkContext.setLogLevel("WARN")
         LOG.info("Spark Session başarıyla oluşturuldu.")
         return spark
     except Exception as e:
@@ -76,48 +78,20 @@ def read_from_kafka(spark: SparkSession,kafka_server: str, kafka_topic: str) -> 
     LOG.info(f"Kafka {kafka_topic} topiğinden veriler başarıyla okundu.")
     return raw_df
 
-def get_mongo_client(db_name: str, collection_name: str) -> pymongo.collection:
+def write_df_to_mongo(df: DataFrame, collection_name: str):
     """
-    MongoDB'ye bağlanır ve istenen koleksiyon nesnesini döndürür.
-        Args:
-            db_name: MongoDB de bulunan database ismi.
-            collection_name: İlgili Database de bulunan koleksiyon ismi.
-        Returns:
-            pymongo.Collection: Koleksiyon Nesnesi
+    Bir Spark DataFrame'ini, Spark'ın kendi dağıtık yazıcısını kullanarak
+    belirtilen MongoDB koleksiyonuna yazar. Bu, ölçeklenebilir yöntemdir.
     """
+    LOG.info(f"'{collection_name}' koleksiyonuna yazma işlemi başlatılıyor...")
     try:
-        LOG.info(f"MongoDB bağlantısı kuruluyor... Veritabanı:{db_name} & Koleksiyon:{collection_name}")
-        client = pymongo.MongoClient(MONGO_CLIENT)
-        db = client[db_name]
-        colllection = db[collection_name]
-        LOG.info(f"MongoDB baplantı başarılı.")
-        return colllection
-    except pymongo.errors as pe:
-        LOG.critical(f"{collection_name} koleksiyonuna bağlanırken hata: {pe}", exc_info=True)
-        return None
-    
-def write_to_mongo_collection(df: DataFrame, collection: pymongo.collection):
-    """
-    Spark DataFrame verilerini MongoDB koleksiyonuna yazar..
-        Args:
-            df(DataFrame): MongoDB de bulunan database ismi.
-            collection(pymongo.collection): İlgili koleksiyon nesnesi.
-        Returns:
-            None
-    """
-    try:
-        LOG.info(f"MongoDB'ye yazılacak satır sayısı: {df.count()}")
-        records = df.collect()
-        if not records:
-            LOG.warning("Yazılacak kayıt bulunamadı.")
-            return
-
-        dict_records = [row.asDict() for row in records]
-        collection.insert_many(dict_records)
-        LOG.info(f"{len(dict_records)} kayıt MongoDB'ye yazıldı.")
+        df.write.format("mongodb") \
+          .mode("overwrite") \
+          .option("collection", collection_name) \
+          .save()
+        LOG.info(f"'{collection_name}' koleksiyonuna başarıyla yazıldı.")
     except Exception as e:
-        LOG.critical(f"MongoDB yazma işlemi başarısız: {e}", exc_info=True)
-        raise
+        LOG.critical(f"'{collection_name}' koleksiyonuna yazılırken hata: {e}", exc_info=True)
 
 
 def transform_raw_data(raw_df: DataFrame, schema: StructType) -> DataFrame:
@@ -308,46 +282,46 @@ def main():
     
     # LAZY EVULATION dolayısıyla Spark hata kontrolü bu kısımda yapılır:
     try:
-       LOG.info("Spark analiz işlemleri başlatıldı... ")
-
-       # Analizler Sırayla Uygulanır:
-
-       # Analiz 1: Konu hakkında en çok tweet atan kullanıcılar
-       
-       top_tweeters_df = get_top_tweeters(final_df).show(10, truncate=False)
-       collection = get_mongo_client("social_media_db", "top_tweeters")
-       write_to_mongo_collection(df=top_tweeters_df,collection=collection)
-
-       # Analiz 2: Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar)
-       famous_top_tweeters_df = get_famous_top_tweeters(final_df).show(10,  truncate=False)
-       collection = get_mongo_client("social_media_db", "famous_top_tweeters")
-       write_to_mongo_collection(df=famous_top_tweeters_df,collection=collection)
-
-       # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
-       isFamous_df = add_isFamous_col(final_df, point=100000)
-       isFamous_df.show(10, truncate=False)
-       collection = get_mongo_client("social_media_db", "isFamous_tweeters")
-       write_to_mongo_collection(df=isFamous_df,collection=collection)
-
-       # Analiz 4: "Ünlü" olan ve olmayanların tweet sayılarının dağılımı
-       isFamous_tweet_distribution_df = get_isFamous_tweet_distribution(isFamous_df).show(10, truncate=False)
-       collection = get_mongo_client("social_media_db", "isFamous_tweet_distribution")
-       write_to_mongo_collection(df=isFamous_tweet_distribution_df,collection=collection)
-
-       
-       # Analiz 5: Düşük takipçili (potansiyel fake/yeni) hesapların aktivitesi
-       low_follower_activity_df = get_low_follower_activity(final_df, point=100).show(10 , truncate=False)
-       collection = get_mongo_client("social_media_db", "low_follower_activity")
-       write_to_mongo_collection(df=low_follower_activity_df,collection=collection)
-
-
-       LOG.info("Spark ile analizler başarıyla tamamlandı ve MongoDB'ye yazıldı.")
+        LOG.info("Spark analiz işlemleri başlatıldı... ")
+ 
+        # Analizler Sırayla Uygulanır:
+ 
+        # Analiz 1: Konu hakkında en çok tweet atan kullanıcılar
+        
+        top_tweeters_df = get_top_tweeters(final_df)
+        top_tweeters_df.show(10, truncate=False)
+        write_df_to_mongo(top_tweeters_df, "top_tweeters")
+ 
+        # Analiz 2: Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar)
+        famous_top_tweeters_df = get_famous_top_tweeters(final_df)
+        famous_top_tweeters_df.show(10,  truncate=False)
+        write_df_to_mongo(famous_top_tweeters_df, "famous_top_tweeters")
+ 
+        # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
+        isFamous_df = add_isFamous_col(final_df, point=100000)
+        isFamous_df.show(10, truncate=False)
+        write_df_to_mongo(isFamous_df, "isFamous_tweeters")
+     
+ 
+        # Analiz 4: "Ünlü" olan ve olmayanların tweet sayılarının dağılımı
+        isFamous_tweet_distribution_df = get_isFamous_tweet_distribution(isFamous_df)
+        isFamous_tweet_distribution_df.show(10, truncate=False)
+        write_df_to_mongo(isFamous_tweet_distribution_df, "fame_distribution_tweeters")
+ 
+        
+        # Analiz 5: Düşük takipçili (potansiyel fake/yeni) hesapların aktivitesi
+        low_follower_activity_df = get_low_follower_activity(final_df, point=100)
+        low_follower_activity_df.show(10 , truncate=False)
+        write_df_to_mongo(low_follower_activity_df, "low_follower_activity_tweeters")
+ 
+ 
+        LOG.info("Spark ile analizler başarıyla tamamlandı ve MongoDB'ye yazıldı.")
     except Exception as e:
-        LOG.critical(f"Spark Analizleri sırasında hata oluştu: {e}", exc_info=True)
-    
+         LOG.critical(f"Spark Analizleri sırasında hata oluştu: {e}", exc_info=True)
+     
     finally:
-        spark.stop()
-        LOG.info("Spark Oturumu durduruldu.")
+         spark.stop()
+         LOG.info("Spark Oturumu durduruldu.")
 
 if __name__ == '__main__':
     main()
