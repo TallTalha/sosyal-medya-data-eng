@@ -153,8 +153,8 @@ FAKE_USER_POOL = [
     {
         "id": str(uuid4()),
         "username": FAKER.unique.user_name(),
-        "follower_count": weighted_random_number(100, 9999999, bias_threshold=100000, bias_ratio=0.97),
-        "friends_count": weighted_random_number(100, 99999, bias_threshold=3333, bias_ratio=0.95) 
+        "follower_count": weighted_random_number(100, 9999999, bias_threshold=10000, bias_ratio=0.99),
+        "friends_count": weighted_random_number(100, 99999, bias_threshold=3333, bias_ratio=0.97) 
     }
     for _ in range(NUM_USERS)
 ]   
@@ -162,7 +162,7 @@ FAKE_USER_POOL = [
 FENOMENLER = [u for u in FAKE_USER_POOL if u["follower_count"] >= 100_000]
 NORMAL_KULLANICILAR = [u for u in FAKE_USER_POOL if u["follower_count"] < 100_000]
 
-def weighted_user_choice(prob_normal: float = 0.8):
+def weighted_user_choice(prob_normal: float = 0.9):
     if random.random() < prob_normal:
         return random.choice(NORMAL_KULLANICILAR)
     return random.choice(FENOMENLER)
