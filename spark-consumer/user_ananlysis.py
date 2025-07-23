@@ -40,12 +40,18 @@ def create_spark_session(appName: str) -> SparkSession:
             SparkSession: Fonksiyon ile oluşturulan Spark oturum nenesidir.
     """
     try:
+
+        packages = "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.mongodb.spark:mongo-spark-connector_2.12:10.3.0"
+        mongo_uri = "mongodb://localhost:27017/social_media_db" # Veritabanı adını burada belirtiyoruz
+        
         LOG.info("Spark Session oluşturuluyor...")
         spark = (
             SparkSession.builder
             .appName(appName)
             .master("local[*]")
-            .config("spark.mongodb.write.connection.uri", MONGO_CLIENT)
+            .config("spark.jars.packages", packages)
+            .config("spark.mongodb.write.connection.uri", mongo_uri) # YAZMA İÇİN
+            .config("spark.mongodb.read.connection.uri", mongo_uri)  # OKUMA İÇİN 
             .getOrCreate()
         )   
         spark.sparkContext.setLogLevel("WARN")
@@ -85,6 +91,11 @@ def write_df_to_mongo(df: DataFrame, collection_name: str):
     """
     LOG.info(f"'{collection_name}' koleksiyonuna yazma işlemi başlatılıyor...")
     try:
+        # Hata vermemesi için DataFrame'in boş olup olmadığını kontrol edelim
+        if df.count() == 0:
+            LOG.warning(f"'{collection_name}' için yazılacak veri bulunamadı. Adım atlanıyor.")
+            return
+
         df.write.format("mongodb") \
           .mode("overwrite") \
           .option("collection", collection_name) \
