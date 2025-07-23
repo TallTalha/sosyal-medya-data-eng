@@ -315,36 +315,31 @@ def main():
        # Analiz 1: Konu hakkında en çok tweet atan kullanıcılar
        
        top_tweeters_df = get_top_tweeters(final_df).show(10, truncate=False)
-       top_tweeters_data = top_tweeters_df.limit(1000).collect()  
        collection = get_mongo_client("social_media_db", "top_tweeters")
-       collection.insert_many([row.asDict() for row in top_tweeters_data])
+       collection.insert_many([row.asDict() for row in top_tweeters_df])
 
        # Analiz 2: Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar)
        famous_top_tweeters_df = get_famous_top_tweeters(final_df).show(10,  truncate=False)
-       famous_top_tweeters_data = famous_top_tweeters_df.limit(1000).collect() 
        collection = get_mongo_client("social_media_db", "famous_top_tweeters")
-       collection.insert_many([row.asDict() for row in famous_top_tweeters_data])
+       collection.insert_many([row.asDict() for row in famous_top_tweeters_df])
 
        # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
        isFamous_df = add_isFamous_col(final_df, point=100000)
        isFamous_df.show(10, truncate=False)
-       isFamous_data = isFamous_df.limit(1000).collect() 
        collection = get_mongo_client("social_media_db", "isFamous_tweeters")
-       collection.insert_many([row.asDict() for row in isFamous_data])
+       collection.insert_many([row.asDict() for row in isFamous_df])
 
        # Analiz 4: "Ünlü" olan ve olmayanların tweet sayılarının dağılımı
        isFamous_tweet_distribution_df = get_isFamous_tweet_distribution(isFamous_df).show(10, truncate=False)
-       isFamous_tweet_distribution_data = isFamous_tweet_distribution_df.limit(1000).collect() 
        collection = get_mongo_client("social_media_db", "isFamous_tweet_distribution")
-       collection.insert_many([row.asDict() for row in isFamous_tweet_distribution_data])
+       collection.insert_many([row.asDict() for row in isFamous_tweet_distribution_df])
        
        # Analiz 5: Düşük takipçili (potansiyel fake/yeni) hesapların aktivitesi
        low_follower_activity_df = get_low_follower_activity(final_df, point=100).show(10 , truncate=False)
-       low_follower_activity_data = low_follower_activity_df.limit(1000).collect() 
        collection = get_mongo_client("social_media_db", "low_follower_activity")
-       collection.insert_many([row.asDict() for row in low_follower_activity_data])
+       collection.insert_many([row.asDict() for row in low_follower_activity_df])
 
-       
+
        LOG.info("Spark ile analizler başarıyla tamamlandı ve MongoDB'ye yazıldı.")
     except Exception as e:
         LOG.critical(f"Spark Analizleri sırasında hata oluştu: {e}", exc_info=True)
