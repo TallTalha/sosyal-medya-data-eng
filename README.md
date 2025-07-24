@@ -116,7 +116,7 @@ sosyal-medya-data-eng/
     ```bash
     cd sosyal-medya-data-eng/
     source twitter-to-mongo-kafka/venv-producer/bin/activate
-    python3 -m twitter-to-mongo-kafka.twitter_producer
+    python3 -m twitter-to-mongo-kafka.twitter_ingestion_service
     ```
 3.  **[SUNUCUDA - Terminal 3]:** Kafka'ya gelen veriyi işleyecek olan Spark batch işini gönder:
     ```bash
