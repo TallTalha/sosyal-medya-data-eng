@@ -154,9 +154,11 @@ def get_top_tweeters(df: DataFrame) -> DataFrame:
     LOG.info("Konu hakkında en çok tweet atan kullanıcılar analizi...")
     top_tweeters_df = (
         df.groupBy("author_id","author_username")
-        .count()
-        .orderBy(F.desc("count"))
-        )
+            .agg(
+                F.count("id").alias("tweet_sayisi")
+            )
+            .orderBy(F.desc("tweet_sayisi"))
+    )
     return top_tweeters_df
 
  # Analiz 2: Konu hakkında tweet atmış en çok takipçili kullanıcılar ve tweet sayıları (Influencer'lar)
@@ -172,11 +174,12 @@ def get_famous_top_tweeters(df: DataFrame) -> DataFrame:
     famous_tweeters_df = (
         df.groupBy("author_id", "author_username") 
         .agg(
-            F.max("follower_count")
-            .alias("max_follower_count")
+            F.max("follower_count").alias("max_follower_count"),
+            F.count("id").alias("tweet_sayisi")
         )
+        .orderBy(F.desc("max_follower_count"))
     )
-    famous_tweeters_df = famous_tweeters_df.orderBy(F.desc("max_follower_count"))
+    
     return famous_tweeters_df
 
 # Analiz 3: Kullanıcıları "Ünlü" olarak etiketleme
@@ -226,9 +229,12 @@ def get_low_follower_activity(df: DataFrame, point: int = 100) -> DataFrame:
     LOG.info(f"{point}'den az, düşük takipçili (potansiyel fake/yeni) hesapların aktivite analizi...")
     activity_df = (
         (df.filter(F.col("follower_count") < point))
-        .groupBy("author_id","author_username","follower_count")
-        .count()
-        .orderBy(F.asc("follower_count"))
+        .groupBy("author_id","author_username")
+        .agg(
+            F.max("follower_count").alias("max_follower_count"),
+            F.count("id").alias("tweet_sayisi")
+        )
+        .orderBy(F.asc("max_follower_count"))
         )
     return activity_df
 
