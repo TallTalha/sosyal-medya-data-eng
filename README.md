@@ -85,11 +85,12 @@ sosyal-medya-data-eng/
 │   └── settings.py             # .env'den ayarları okuyan modül
 ├── spark-consumer/
 │   ├── venv-spark/
-│   ├── user_analysis.py        # Spark ile analizleri yapan ana script
+│   ├── user_analysis.py        # Kullanıcı bazlı, Spark  analizleri yapan script     
+│   ├── daily_trend_analysis.py # Gün bazlı, Spark  analizleri yapan script
 │   └── requirements.txt
-├── twitter-ingestion-service/  # Twitter'dan veri çeken servis (yeni isim)
+├── twitter-to-mongo-kafka/  # Twitter'dan veri çeken servis 
 │   ├── venv-producer/
-│   ├── twitter_producer.py     # Ana script (yeni isim)
+│   ├── twitter_ingestion_service.py     # Veri çeken ve üretebilen ana script 
 │   └── requirements.txt
 ├── utils/
 │   └── logger.py               # Merkezi loglama modülü
@@ -113,9 +114,9 @@ sosyal-medya-data-eng/
 1.  **[KENDİ PC'NDE - Terminal 1]:** Uzak sunucudaki servislere (MongoDB, Kafka) erişim için SSH tünelini başlat: `ssh sunucum`
 2.  **[KENDİ PC'NDE - Terminal 2]:** Twitter'dan veri çekip Kafka ve MongoDB'ye gönderecek olan ingestion servisini başlat:
     ```bash
-    cd sosyal-medya-data-eng/twitter-ingestion-service
-    source venv-producer/bin/activate
-    python twitter_producer.py
+    cd sosyal-medya-data-eng/
+    source twitter-to-mongo-kafka/venv-producer/bin/activate
+    python3 -m twitter-to-mongo-kafka.twitter_producer
     ```
 3.  **[SUNUCUDA - Terminal 3]:** Kafka'ya gelen veriyi işleyecek olan Spark batch işini gönder:
     ```bash
